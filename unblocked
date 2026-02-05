@@ -1,41 +1,165 @@
-{
-  "summaryUpdate": "Create an app that includes proxy functionality and supports importing files.",
-  "new_feature_requests_to_add": [
-    {
-      "id": "AR-1",
-      "summary": "Build a working app with proxy functionality",
-      "reqIds": [
-        
-      ],
-      "status": "pending"
-    },
-    {
-      "id": "AR-2",
-      "summary": "Add a way to import files into the app",
-      "reqIds": [
-        
-      ],
-      "status": "pending"
-    }
-  ],
-  "new_feature_requests_to_remove": [
-    
-  ],
-  "architecturalNotesToAdd": [
-    
-  ],
-  "architecturalNotesToRemove": [
-    
-  ],
-  "knownIssuesToAdd": [
-    
-  ],
-  "knownIssuesToRemove": [
-    
-  ],
-  "isFixRequest": false,
-  "imageRequirements": null,
-  "generatedImages": null,
-  "gameProjectType": "none",
-  "projectName": null
-}
+import Map "mo:core/Map";
+import Nat "mo:core/Nat";
+import Array "mo:core/Array";
+import Blob "mo:core/Blob";
+import Text "mo:core/Text";
+import Runtime "mo:core/Runtime";
+import List "mo:core/List";
+import Iter "mo:core/Iter";
+import Order "mo:core/Order";
+import Principal "mo:core/Principal";
+import MixinAuthorization "authorization/MixinAuthorization";
+import OutCall "http-outcalls/outcall";
+import AccessControl "authorization/access-control";
+
+actor {
+  let accessControlState = AccessControl.initState();
+  include MixinAuthorization(accessControlState);
+
+  public type UserProfile = {
+    name : Text;
+  };
+
+  let userProfiles = Map.empty<Principal, UserProfile>();
+
+  public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view profiles");
+    };
+    userProfiles.get(caller);
+  };
+
+  public query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
+    if (caller != user and not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Can only view your own profile");
+    };
+    userProfiles.get(user);
+  };
+
+  public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can save profiles");
+    };
+    userProfiles.add(caller, profile);
+  };
+
+  public type File = {
+    id : Nat;
+    owner : Principal;
+    name : Text;
+    contentType : Text;
+    size : Nat;
+    content : Blob;
+  };
+
+  let files = Map.empty<Nat, File>();
+  var nextFileId = 0;
+
+  module File {
+    public func compareByName(file1 : File, file2 : File) : Order.Order {
+      Text.compare(file1.name, file2.name);
+    };
+
+    public func compareBySize(file1 : File, file2 : File) : Order.Order {
+      Nat.compare(file1.size, file2.size);
+    };
+  };
+
+  public query ({ caller }) func transform(input : OutCall.TransformationInput) : async OutCall.TransformationOutput {
+    OutCall.transform(input);
+  };
+
+  public shared ({ caller }) func proxyFetch(url : Text) : async Text {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can use proxy fetch");
+    };
+    await OutCall.httpGetRequest(url, [], transform);
+  };
+
+  public shared ({ caller }) func uploadFile(name : Text, contentType : Text, content : Blob) : async Nat {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can upload files");
+    };
+
+    let id = nextFileId;
+    nextFileId += 1;
+
+    let file : File = {
+      id;
+      owner = caller;
+      name;
+      contentType;
+      size = content.size();
+      content;
+    };
+
+    files.add(id, file);
+    id;
+  };
+
+  public query ({ caller }) func getFilesForCaller() : async [File] {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can view files");
+    };
+
+    let ownedFiles = List.empty<File>();
+    for (file in files.values()) {
+      switch (file.owner == caller) {
+        case (true) { ownedFiles.add(file) };
+        case (false) {};
+      };
+    };
+    ownedFiles.toArray();
+  };
+
+  public query ({ caller }) func getFilesSortedByName() : async [File] {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can view files");
+    };
+
+    let callerFiles = files.values().toArray().filter(func(file) { file.owner == caller });
+    callerFiles.sort(File.compareByName);
+  };
+
+  public query ({ caller }) func getFilesSortedBySize() : async [File] {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can view files");
+    };
+
+    let callerFiles = files.values().toArray().filter(func(file) { file.owner == caller });
+    callerFiles.sort(File.compareBySize);
+  };
+
+  public query ({ caller }) func getFile(fileId : Nat) : async File {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can view files");
+    };
+
+    switch (files.get(fileId)) {
+      case (null) { Runtime.trap("File not found") };
+      case (?file) {
+        if (file.owner != caller and not AccessControl.isAdmin(accessControlState, caller)) {
+          Runtime.trap("Access denied: You do not own this file");
+        };
+        file;
+      };
+    };
+  };
+
+  public shared ({ caller }) func deleteFile(fileId : Nat) : async () {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can delete files");
+    };
+
+    switch (files.get(fileId)) {
+      case (null) { Runtime.trap("File not found") };
+      case (?file) {
+        if (file.owner != caller and not AccessControl.isAdmin(accessControlState, caller)) {
+          Runtime.trap("Access denied: You do not own this file");
+        };
+        files.remove(fileId);
+      };
+    };
+  };
+};
+
