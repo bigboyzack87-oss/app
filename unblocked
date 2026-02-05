@@ -1,0 +1,41 @@
+{
+  "summaryUpdate": null,
+  "new_feature_requests_to_add": [
+    {
+      "id": "AR-1",
+      "summary": "Build an app that includes proxy functionality (strong proxy requested earlier).",
+      "reqIds": [
+        
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-2",
+      "summary": "Add a way to import files into the app (requested earlier as 'in port files').",
+      "reqIds": [
+        
+      ],
+      "status": "pending"
+    }
+  ],
+  "new_feature_requests_to_remove": [
+    
+  ],
+  "architecturalNotesToAdd": [
+    
+  ],
+  "architecturalNotesToRemove": [
+    
+  ],
+  "knownIssuesToAdd": [
+    
+  ],
+  "knownIssuesToRemove": [
+    
+  ],
+  "isFixRequest": false,
+  "imageRequirements": null,
+  "generatedImages": null,
+  "gameProjectType": null,
+  "projectName": null
+}
