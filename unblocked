@@ -1,1 +1,41 @@
-import OutCall "http-outcalls/outcall";import Map "mo:core/Map";import Text "mo:core/Text";import Array "mo:core/Array";import Timer "mo:core/Timer";import Storage "blob-storage/Storage";import Iter "mo:core/Iter";import Time "mo:core/Time";import Principal "mo:core/Principal";import Runtime "mo:core/Runtime";import MixinStorage "blob-storage/Mixin";import MixinAuthorization "authorization/MixinAuthorization";import AccessControl "authorization/access-control";actor {  // Proxy Response Handling  public type ProxyResponse = {    statusCode : Nat;    responseBody : Text; // For now return as text    headers : [(Text, Text)];    url : Text;  };  // Allowlist persistent store  let allowlistEntries = Map.empty<Text, AllowListEntry>();  // State for HTTP outcalls must be persistent for timers to work across requests.  let permanentState = Map.empty<Text, ProxyRequest>();  let inFlightRequests = Map.empty<Text, Timer.TimerId>();  // Record the original request parameters.  type ProxyRequest = {    caller : Principal;    url : Text;    timestamp : Time.Time;  };  // Allowlist Entry  type AllowListEntry = {    caller : Principal;    timestamp : Time.Time;  };  // Storage  include MixinStorage();  // Authentication  let accessControlState = AccessControl.initState();  include MixinAuthorization(accessControlState);
+{
+  "summaryUpdate": "Create an app that includes proxy functionality and supports importing files.",
+  "new_feature_requests_to_add": [
+    {
+      "id": "AR-1",
+      "summary": "Build a working app with proxy functionality",
+      "reqIds": [
+        
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-2",
+      "summary": "Add a way to import files into the app",
+      "reqIds": [
+        
+      ],
+      "status": "pending"
+    }
+  ],
+  "new_feature_requests_to_remove": [
+    
+  ],
+  "architecturalNotesToAdd": [
+    
+  ],
+  "architecturalNotesToRemove": [
+    
+  ],
+  "knownIssuesToAdd": [
+    
+  ],
+  "knownIssuesToRemove": [
+    
+  ],
+  "isFixRequest": false,
+  "imageRequirements": null,
+  "generatedImages": null,
+  "gameProjectType": "none",
+  "projectName": null
+}
